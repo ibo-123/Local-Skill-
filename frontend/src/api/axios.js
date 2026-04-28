@@ -1,16 +1,16 @@
 import axios from 'axios';
 
 // ================= BASE URL =================
-// Use environment variable in production, fallback for local dev
 const BASE_URL =
-  process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  process.env.REACT_APP_API_URL ||
+  'https://local-skill-freelancer.onrender.com/api'; // ✅ FIXED
 
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   },
-  timeout: 15000 // increased timeout for Render cold starts
+  timeout: 15000,
 });
 
 // ================= REQUEST INTERCEPTOR =================
@@ -23,7 +23,10 @@ api.interceptors.request.use(
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🚀 [Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.data);
+      console.log(
+        `🚀 [Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
+        config.data
+      );
     }
 
     return config;
@@ -34,7 +37,7 @@ api.interceptors.request.use(
   }
 );
 
-// ================= TOKEN REFRESH LOGIC =================
+// ================= TOKEN REFRESH =================
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -50,7 +53,9 @@ const processQueue = (error, token = null) => {
 api.interceptors.response.use(
   (response) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`✅ [Response] ${response.status} ${response.config.url}`);
+      console.log(
+        `✅ [Response] ${response.status} ${response.config.url}`
+      );
     }
     return response;
   },
@@ -60,7 +65,6 @@ api.interceptors.response.use(
     // ================= HANDLE 401 =================
     if (error.response?.status === 401 && !originalRequest._retry) {
 
-      // Prevent infinite loop
       if (
         originalRequest.url?.includes('/auth/login') ||
         originalRequest.url?.includes('/auth/register')
@@ -68,7 +72,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Queue requests during refresh
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -86,17 +89,18 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refreshToken');
 
-        if (!refreshToken) throw new Error('No refresh token');
+        if (!refreshToken) {
+          throw new Error('No refresh token');
+        }
 
-        const response = await axios.post(
+        const res = await axios.post(
           `${BASE_URL}/auth/refresh`,
           { refreshToken }
         );
 
-        const { token, refreshToken: newRefreshToken } = response.data;
+        const { token, refreshToken: newRefreshToken } = res.data;
 
         setAuthTokens(token, newRefreshToken);
-
         processQueue(null, token);
 
         originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -113,25 +117,27 @@ api.interceptors.response.use(
 
     // ================= OTHER ERRORS =================
     if (error.response) {
-      console.error(`❌ [API Error] ${error.response.status} ${error.config?.url}`);
+      console.error(
+        `❌ [API Error] ${error.response.status} ${error.config?.url}`
+      );
 
       switch (error.response.status) {
         case 403:
-          console.error('Forbidden access');
+          console.error('🚫 Forbidden');
           break;
         case 404:
-          console.error('Resource not found');
+          console.error('🔍 Not Found → Check endpoint or /api prefix');
           break;
         case 500:
-          console.error('Server error');
+          console.error('💥 Server Error');
           break;
         default:
           break;
       }
     } else if (error.request) {
-      console.error('❌ No response from server (possible Render cold start)');
+      console.error('📡 No response from server (network issue)');
     } else {
-      console.error('❌ Request setup error:', error.message);
+      console.error('⚙️ Axios setup error:', error.message);
     }
 
     return Promise.reject(error);
@@ -139,12 +145,6 @@ api.interceptors.response.use(
 );
 
 // ================= AUTH HELPERS =================
-export const clearAuthTokens = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
-};
-
 export const setAuthTokens = (token, refreshToken = null) => {
   localStorage.setItem('token', token);
 
@@ -155,7 +155,12 @@ export const setAuthTokens = (token, refreshToken = null) => {
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 };
 
-// ================= AUTH CHECK =================
+export const clearAuthTokens = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+};
+
 export const isAuthenticated = () => {
   const token = localStorage.getItem('token');
   if (!token) return false;
