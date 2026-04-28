@@ -1,14 +1,3 @@
 # Node.js dependencies
 /.env
 /node_modules
-/dist
-/build
-/coverage
-/.vscode
-.DS_Store
-*.log
-*.tmp
-*.bak
-*.swp
-*.swo
-*.pid   
