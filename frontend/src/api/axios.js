@@ -1,12 +1,16 @@
-
 import axios from 'axios';
 
+// ================= BASE URL =================
+// Use environment variable in production, fallback for local dev
+const BASE_URL =
+  process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 10000
+  timeout: 15000 // increased timeout for Render cold starts
 });
 
 // ================= REQUEST INTERCEPTOR =================
@@ -19,13 +23,13 @@ api.interceptors.request.use(
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🚀 [Request] ${config.method?.toUpperCase()} ${config.url}`, config.data);
+      console.log(`🚀 [Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.data);
     }
 
     return config;
   },
   (error) => {
-    console.error('Request Error:', error);
+    console.error('❌ Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -56,7 +60,7 @@ api.interceptors.response.use(
     // ================= HANDLE 401 =================
     if (error.response?.status === 401 && !originalRequest._retry) {
 
-      // Avoid refresh loop for auth endpoints
+      // Prevent infinite loop
       if (
         originalRequest.url?.includes('/auth/login') ||
         originalRequest.url?.includes('/auth/register')
@@ -64,7 +68,7 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Queue requests while refreshing
+      // Queue requests during refresh
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -82,36 +86,26 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refreshToken');
 
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
+        if (!refreshToken) throw new Error('No refresh token');
 
         const response = await axios.post(
-          `${api.defaults.baseURL}/auth/refresh`,
+          `${BASE_URL}/auth/refresh`,
           { refreshToken }
         );
 
         const { token, refreshToken: newRefreshToken } = response.data;
 
-        // Save new tokens
         setAuthTokens(token, newRefreshToken);
 
-        // Process queued requests
         processQueue(null, token);
 
-        // Retry original request
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
 
       } catch (refreshError) {
         processQueue(refreshError, null);
-
-        // 🔥 FIX: NO HARD RELOAD HERE
         clearAuthTokens();
-
-        // Let React handle redirect (IMPORTANT)
         return Promise.reject(refreshError);
-
       } finally {
         isRefreshing = false;
       }
@@ -135,9 +129,9 @@ api.interceptors.response.use(
           break;
       }
     } else if (error.request) {
-      console.error('No response from server:', error.request);
+      console.error('❌ No response from server (possible Render cold start)');
     } else {
-      console.error('Request setup error:', error.message);
+      console.error('❌ Request setup error:', error.message);
     }
 
     return Promise.reject(error);
@@ -161,7 +155,7 @@ export const setAuthTokens = (token, refreshToken = null) => {
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 };
 
-// 🔥 FIXED: PURE FUNCTION (NO SIDE EFFECTS)
+// ================= AUTH CHECK =================
 export const isAuthenticated = () => {
   const token = localStorage.getItem('token');
   if (!token) return false;
