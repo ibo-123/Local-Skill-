@@ -79,8 +79,17 @@ function App() {
                       } 
                     />
                     
+                    <Route path="/jobs" element={<Home />} />
                     <Route 
                       path="/proposals" 
+                      element={
+                        <ProtectedRoute roles={['freelancer']}>
+                          <Proposals />
+                        </ProtectedRoute>
+                      } 
+                    />
+                    <Route 
+                      path="/my-proposals" 
                       element={
                         <ProtectedRoute roles={['freelancer']}>
                           <Proposals />
