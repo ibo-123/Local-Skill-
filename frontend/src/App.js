@@ -24,6 +24,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const Proposals = lazy(() => import('./pages/Proposals'));
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -74,6 +75,15 @@ function App() {
                       element={
                         <ProtectedRoute>
                           <Settings />
+                        </ProtectedRoute>
+                      } 
+                    />
+                    
+                    <Route 
+                      path="/proposals" 
+                      element={
+                        <ProtectedRoute roles={['freelancer']}>
+                          <Proposals />
                         </ProtectedRoute>
                       } 
                     />
